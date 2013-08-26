@@ -285,11 +285,18 @@ static NSMutableDictionary *RKRegisteredResponseMapperOperationDataSourceClasses
 - (void)main
 {
     if (self.isCancelled) return [self willFinish];
-
-    BOOL isErrorStatusCode = [RKErrorStatusCodes() containsIndex:self.response.statusCode];
+    
+    BOOL isValidStatusCode = NO;
+    
+    for (RKResponseDescriptor *responseDescriptor in self.matchingResponseDescriptors) {
+        if ([responseDescriptor.statusCodes containsIndex:self.response.statusCode]) {
+            isValidStatusCode = YES;
+            break;
+        }
+    }
     
     // If we are an error response and empty, we emit an error that the content is unmappable
-    if (isErrorStatusCode && [self hasEmptyResponse]) {
+    if (!isValidStatusCode && [self hasEmptyResponse]) {
         self.error = RKUnprocessableErrorFromResponse(self.response);
         [self willFinish];
         return;
@@ -337,7 +344,7 @@ static NSMutableDictionary *RKRegisteredResponseMapperOperationDataSourceClasses
     self.mappingResult = [self performMappingWithObject:parsedBody error:&error];    
     
     // If the response is a client error return either the mapping error or the mapped result to the caller as the error
-    if (isErrorStatusCode) {
+    if (!isValidStatusCode) {
         if ([self.mappingResult count] > 0) {
             error = RKErrorFromMappingResult(self.mappingResult);
         } else {
